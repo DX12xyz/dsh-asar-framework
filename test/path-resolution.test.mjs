@@ -105,10 +105,15 @@ function writeApp(dir, appName, pkg) {
 test('this checkout\'s own package root is found by walking up from a module', () => {
   const here = moduleDirOf(new URL(import.meta.url).href);
   const root = findPackageRoot(here);
-  assert.notEqual(root, null, 'the test runs from pkg/test/, so the root must be findable');
+  assert.notEqual(root, null, 'the test runs from <package>/test/, so the root must be findable');
   assert.equal(looksLikePackageRoot(root), true);
   // The two runtime artefacts the Host needs must both be there.
-  assert.equal(path.basename(root), 'pkg');
+  //
+  // The directory NAME is not asserted on purpose: the same sources run in two
+  // checkouts — the development repository, where the package sits in `pkg/`,
+  // and the published repository, where the package IS the repository root.
+  // Pinning `pkg` here would make the published repo's CI fail on a fact that
+  // is not part of the package's identity; the manifest name is.
   assert.equal(typeof JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).name, 'string');
 });
 
