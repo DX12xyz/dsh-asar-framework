@@ -1,0 +1,8 @@
+{
+  "name": "@dx12xyz/dsh-asar-framework-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Build artefact of the DSH tray bridge. dist/tray-bridge.js is loaded by the patched Electron main process with createRequire, so this directory is commonjs even though the package root is ESM.",
+  "type": "commonjs",
+  "main": "dist/tray-bridge.js"
+}

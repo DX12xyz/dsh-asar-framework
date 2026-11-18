@@ -1,0 +1,4 @@
+- insert:
+    - id: dsh-asar-framework
+      name: '@dx12xyz/dsh-asar-framework'
+      config: {}

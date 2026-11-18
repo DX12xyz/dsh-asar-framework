@@ -1,0 +1,116 @@
+name: CI
+
+# Read-only verification. Nothing here writes to the asar, publishes anything,
+# or needs a secret. It runs on Windows because this plugin targets the Windows
+# x64 DSH desktop build; running it on Linux would test the wrong platform.
+#
+# Run locally with the same commands (from pkg/):
+#   node --test --test-isolation=none test/*.test.mjs
+#   node scripts/build-bridge.mjs --check
+#   npm pack --dry-run
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (windows, node 24)
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: pkg
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Do not let the checkout rewrite line endings. The docs are LF on
+          # disk, and .gitattributes pins eol=lf, but being explicit here means
+          # the build script sees the same bytes on a runner as it does locally.
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Show the runtime and the file encoding we actually got
+        run: |
+          node --version
+          npm --version
+          node -e "
+            const b = require('node:fs').readFileSync('lib/bridge/src/paths.js');
+            const cr = b.filter((x) => x === 13).length;
+            console.log('CR bytes in paths.js:', cr);
+            if (cr !== 0) {
+              console.error('checkout produced CRLF; the build script needs LF');
+              process.exit(1);
+            }
+          "
+
+      - name: Bridge artefact is byte-identical to its sources
+        # If a source file changed without regenerating the artefact, `--check`
+        # fails here and the job stops before the (slower) test suite.
+        run: node scripts/build-bridge.mjs --check
+
+      - name: Test suite
+        # `--test-isolation=none` is required: the suite shares one process on
+        # purpose (it fakes Module._load, require.cache and the poll timers).
+        # Real-archive tests skip themselves cleanly when no desktop install is
+        # present, which is the normal case on a CI runner.
+        run: node --test --test-isolation=none test/*.test.mjs
+        env:
+          # The suite must work with an EMPTY DSH_HOME; a temp dir proves it.
+          DSH_HOME: ${{ runner.temp }}/dsh-home
+
+      - name: Package contents
+        # Proves what would actually be published: the file list, the size, and
+        # that no test / scratch / archive sneaks into the tarball.
+        run: |
+          npm pack --dry-run --json > pack.json
+          node -e "
+            const fs = require('node:fs');
+            const report = JSON.parse(fs.readFileSync('pack.json', 'utf8'))[0];
+            const files = report.files.map((f) => f.path);
+            console.log('files:', files.length, '| packed:', report.size, 'B');
+            const forbidden = files.filter((p) =>
+              p.startsWith('test/') ||
+              p.startsWith('scratch/') ||
+              p.endsWith('.asar') ||
+              p.endsWith('.bak'));
+            if (forbidden.length > 0) {
+              console.error('forbidden files in the tarball:', forbidden);
+              process.exit(1);
+            }
+            const required = ['index.js', 'client.js', 'package.json', 'LICENSE',
+              'cordis.patch.yml', 'bridge/dist/tray-bridge.js'];
+            const missing = required.filter((p) => !files.includes(p));
+            if (missing.length > 0) {
+              console.error('required files missing from the tarball:', missing);
+              process.exit(1);
+            }
+            console.log('package contents OK');
+          "
+        env:
+          # npm's default cache dir is not writable on every machine; point it
+          # at a runner temp dir so `npm pack` cannot fail for that reason.
+          npm_config_cache: ${{ runner.temp }}/npm-cache
+
+      - name: Upload the package report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-report
+          path: pkg/pack.json
+          if-no-files-found: error

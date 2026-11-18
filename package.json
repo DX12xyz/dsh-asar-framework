@@ -1,0 +1,73 @@
+{
+  "name": "@dx12xyz/dsh-asar-framework",
+  "version": "0.7.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "DSH desktop asar bridge base: replaces the small tray-owning code region inside app.asar with a forwarding stub of the same byte length, so Host plugins can extend notification, menus, windows and tray without replacing the archive.",
+  "author": "DX12xyz",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "asar",
+    "tray",
+    "electron",
+    "plugin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DX12xyz/dsh-asar-framework.git"
+  },
+  "homepage": "https://github.com/DX12xyz/dsh-asar-framework#readme",
+  "bugs": {
+    "url": "https://github.com/DX12xyz/dsh-asar-framework/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "locale/*.json",
+    "lib/**/*.js",
+    "lib/**/*.ps1",
+    "bridge/package.json",
+    "bridge/dist/tray-bridge.js",
+    "scripts/*.mjs",
+    "docs",
+    "README.md",
+    "TECHDOC.md",
+    "HISTVER.md",
+    "THIRD_PARTY_NOTICES.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "dsh": ">=0.2.2-rc.1 <0.3.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout"
+      ]
+    }
+  }
+}
