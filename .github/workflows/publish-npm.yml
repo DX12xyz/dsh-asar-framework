@@ -248,6 +248,8 @@ jobs:
           TARBALL: ${{ steps.pack.outputs.file }}
           PKG_NAME: ${{ steps.version.outputs.name }}
           PKG_VERSION: ${{ steps.version.outputs.version }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
           $ErrorActionPreference = 'Continue'
           $PSNativeCommandUseErrorActionPreference = $false
@@ -265,8 +267,19 @@ jobs:
           if ($code -ne 0) {
             Write-Host "::error::npm publish failed with token authentication (exit ${code}). Nothing was published."
             Write-Host "Most likely causes and fixes:"
-            Write-Host "  - 401 Unauthorized : NPM_TOKEN is expired, revoked or wrong. Create a new Granular Access Token (read+write, public packages) and update the repo secret NPM_TOKEN."
-            Write-Host "  - 403 Forbidden    : the token may not publish this scope. Check the token's package scope and the package's publishing access settings on npmjs.com."
+            Write-Host "  - 403 Forbidden / 'two-factor authentication ... is required' :"
+            Write-Host "      npm has required 2FA (or a 2FA-bypassing token) for publishing since 2026."
+            Write-Host "      A plain Granular Access Token is NOT enough. Pick one:"
+            Write-Host "        a) recreate the token at npmjs.com -> Access Tokens -> Generate New Token,"
+            Write-Host "           tick 'Bypass two-factor authentication', grant read+write for this package,"
+            Write-Host "           update the repo secret NPM_TOKEN;  (2FA need not be enabled on the account)"
+            Write-Host "        b) or drop NPM_TOKEN entirely and use OIDC trusted publishing:"
+            Write-Host "           npmjs.com -> the package -> Settings -> Publishing access -> GitHub Actions,"
+            Write-Host "           owner '${env:REPO_OWNER}', repository '${env:REPO_NAME}',"
+            Write-Host "           workflow filename 'publish-npm.yml', environment empty."
+            Write-Host "  - 401 Unauthorized : NPM_TOKEN is expired, revoked or wrong. Create a new token as above."
+            Write-Host "        (note: a 2FA-bypass token only needs read+write for THIS package and its scope;"
+            Write-Host "         the account itself does not have to have 2FA enabled.)"
             Write-Host "  - E409/E422        : that exact version already exists. Raise version in package.json; a version number cannot be reused."
             Write-Host "  - provenance error : --provenance needs a public repository plus id-token: write (this workflow has it)."
             exit 1
