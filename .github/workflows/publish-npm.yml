@@ -3,7 +3,12 @@ name: Publish to npm
 # =============================================================================
 # 通用模板：GitHub Release -> npm 同步发布
 #
-# 怎么把它用到别的项目：见 docs/PUBLISHING-GITHUB-ACTIONS.md。
+# 换项目使用时：把这份文件复制到目标仓库的 .github/workflows/ 即可，无需改动。
+# 需要准备的东西只有两样：
+#   1. package.json 里有 name / version，且没有 "private": true（带 scope 的包还要
+#      publishConfig.access = "public"）；
+#   2. 认证二选一 —— 仓库 secret NPM_TOKEN，或 npm 上给这个包配 GitHub Actions
+#      trusted publisher（owner / 仓库名 / workflow 文件名 publish-npm.yml）。
 #
 # ⚠️ npm 发布不可逆。一个版本号一旦发布过，就永远绑定那一次发布：
 #    `npm unpublish` 也不会释放那个版本号，任何人都不能再用同一个
