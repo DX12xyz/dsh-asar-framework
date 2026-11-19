@@ -82,12 +82,21 @@ jobs:
           node scripts/build-bridge.mjs --check
 
       - name: Test suite
+        # The published repository does not carry test/ at all: the suite lives
+        # in the private development repository. So the suite is optional here
+        # and its ABSENCE is a skip, never a failure. The development repository
+        # does have test/, runs this exact file, and still runs the real suite.
         # `--test-isolation=none` is required: the suite shares one process on
         # purpose (it fakes Module._load, require.cache and the poll timers).
         # Real-archive tests skip themselves cleanly when no desktop install is
         # present, which is the normal case on a CI runner.
         run: |
           Set-Location $env:PKG_DIR
+          if (-not (Test-Path "test")) {
+            Write-Host "::notice::test/ is not part of this repository; the suite lives in the development repository"
+            Write-Host "test suite SKIPPED (no test/ directory in $env:PKG_DIR)"
+            exit 0
+          }
           node --test --test-isolation=none test/*.test.mjs
         env:
           # The suite must work with an EMPTY DSH_HOME; a temp dir proves it.
