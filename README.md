@@ -3,7 +3,10 @@
 **给 DSH 桌面版插件，开一扇通往主进程的门 —— 不用重新打包 `app.asar`。**
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/DX12xyz/dsh-asar-framework/total?style=flat-square&logo=Github)
+![NPM Downloads](https://img.shields.io/npm/d18m/%40dx12xyz%2Fdsh-asar-framework?style=flat-square&logo=npm)
 [![](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+
 
 ---
 
@@ -60,7 +63,7 @@ pnpm add @dx12xyz/dsh-asar-framework
 **3 · GitHub Release 里的 tgz**
 
 ```powershell
-Invoke-WebRequest -Uri 'https://github.com/DX12xyz/dsh-asar-framework/releases/download/v0.7.2-hotfix1/dx12xyz-dsh-asar-framework-0.7.2-hotfix1.tgz' -OutFile .\pkg.tgz
+Invoke-WebRequest -Uri 'https://github.com/DX12xyz/dsh-asar-framework/releases/download/v0.7.3/dx12xyz-dsh-asar-framework-0.7.3.tgz' -OutFile .\pkg.tgz
 dsh plugin --profile desktop add .\pkg.tgz
 ```
 

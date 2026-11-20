@@ -1,6 +1,6 @@
 {
   "name": "@dx12xyz/dsh-asar-framework",
-  "version": "0.7.2-hotfix1",
+  "version": "0.7.3",
   "type": "module",
   "license": "MIT",
   "description": "DSH 桌面版 asar 壳桥基座：在 app.asar 官方托盘代码之后插入一段属于本包的可增长区域，让 Host 插件在不重新打包归档的前提下扩展托盘、通知、窗口与运行期行为。",

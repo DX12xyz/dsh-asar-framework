@@ -56,7 +56,7 @@ __factories["paths.js"] = function () {
 	 * owner. It stayed at `'0.1.0'` for three releases, which made `bridge.load.json`
 	 * useless for exactly this question (audit 2026-11-16, item 9).
 	 */
-	const BRIDGE_VERSION = '0.7.2-hotfix1';
+	const BRIDGE_VERSION = '0.7.3';
 
 	/** Wire protocol version of menu.json and events.jsonl. */
 	const PROTOCOL = 2;
