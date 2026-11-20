@@ -260,7 +260,13 @@ jobs:
           }
 
           Write-Host "publishing ${env:PKG_NAME}@${env:PKG_VERSION} with token authentication"
-          $raw = & npm publish $env:TARBALL --access public --provenance 2>&1
+          # npm 拒绝在没有 --tag 的情况下发布预发布版本（`0.7.2-hotfix1` 含 `-`），
+          # 而且预发布版本本来就不该移动 `latest`：装了默认的 `npm i` 的用户
+          # 不该自动拿到一个还没验证完的版本。所以预发布发到独立的 `next` 标签，
+          # 正式版才走默认的 `latest`。
+          if ($env:PKG_VERSION -match '-') { $distTag = 'next' } else { $distTag = 'latest' }
+          Write-Host "dist-tag: $distTag (prerelease versions never move 'latest')"
+          $raw = & npm publish $env:TARBALL --access public --provenance --tag $distTag 2>&1
           $code = $LASTEXITCODE
           Write-Host ($raw | Out-String)
 
@@ -340,7 +346,10 @@ jobs:
           }
 
           Write-Host "no NPM_TOKEN secret: publishing ${env:PKG_NAME}@${env:PKG_VERSION} with OIDC trusted publishing"
-          $raw = & npm publish $env:TARBALL --access public --provenance 2>&1
+          # 同 token 分支：预发布版本必须显式给 --tag，且不能移动 latest。
+          if ($env:PKG_VERSION -match '-') { $distTag = 'next' } else { $distTag = 'latest' }
+          Write-Host "dist-tag: $distTag (prerelease versions never move 'latest')"
+          $raw = & npm publish $env:TARBALL --access public --provenance --tag $distTag 2>&1
           $code = $LASTEXITCODE
           Write-Host ($raw | Out-String)
 
