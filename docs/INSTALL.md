@@ -49,17 +49,17 @@ pnpm add @dx12xyz/dsh-asar-framework
 ## 途径 3：GitHub Release 里的 tgz
 
 从 <https://github.com/DX12xyz/dsh-asar-framework/releases> 下载
-`dx12xyz-dsh-asar-framework-0.7.0.tgz`（换成你需要的版本），然后本地装：
+`dx12xyz-dsh-asar-framework-0.7.2-hotfix1.tgz`（换成你需要的版本），然后本地装：
 
 ```powershell
-& '<DSH安装目录>\resources\runtime\cli\bin\dsh.cmd' plugin --profile desktop add %USERPROFILE%\Downloads\dx12xyz-dsh-asar-framework-0.7.0.tgz
+& '<DSH安装目录>\resources\runtime\cli\bin\dsh.cmd' plugin --profile desktop add %USERPROFILE%\Downloads\dx12xyz-dsh-asar-framework-0.7.2-hotfix1.tgz
 ```
 
 或者先下载到当前目录再装：
 
 ```powershell
-Invoke-WebRequest -Uri 'https://github.com/DX12xyz/dsh-asar-framework/releases/download/v0.7.0/dx12xyz-dsh-asar-framework-0.7.0.tgz' -OutFile .\dx12xyz-dsh-asar-framework-0.7.0.tgz
-& '<DSH安装目录>\resources\runtime\cli\bin\dsh.cmd' plugin --profile desktop add .\dx12xyz-dsh-asar-framework-0.7.0.tgz
+Invoke-WebRequest -Uri 'https://github.com/DX12xyz/dsh-asar-framework/releases/download/v0.7.2-hotfix1/dx12xyz-dsh-asar-framework-0.7.2-hotfix1.tgz' -OutFile .\dx12xyz-dsh-asar-framework-0.7.2-hotfix1.tgz
+& '<DSH安装目录>\resources\runtime\cli\bin\dsh.cmd' plugin --profile desktop add .\dx12xyz-dsh-asar-framework-0.7.2-hotfix1.tgz
 ```
 
 ---

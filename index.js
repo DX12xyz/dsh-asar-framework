@@ -74,7 +74,11 @@ function probePower(ctx) {
 export function apply(ctx, config = {}) {
   const resolved = { ...DEFAULT_CONFIG, ...(config ?? {}) };
   const stateDir = stateDirOf(process.env);
-  const state = createSetupState({ stateDir });
+  // The package root is handed over instead of re-discovered: the registration
+  // probe in `lib/host/identity.js` has to read THIS package's own manifest and
+  // then walk upward to the profile that registered it, and `index.js` already
+  // resolved that root once.
+  const state = createSetupState({ stateDir, packageRoot: PACKAGE_ROOT });
 
   // Remember the root this run discovered, so the service does not have to scan
   // again on every snapshot.

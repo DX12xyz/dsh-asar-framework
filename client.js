@@ -280,6 +280,46 @@ window.__ModuleLoader__.load({
       try { window.localStorage.removeItem(LEGACY_DISMISS_KEY); } catch { /* private mode */ }
     }
 
+    // ---------------------------------------------- bundle-config registration --
+    //
+    // WHERE THE SETTINGS CARD'S KEY COMES FROM, AND WHY IT IS NOT A CONSTANT.
+    //
+    // `PluginManagerPage.tsx` decides whether to render a bundle's configuration
+    // section with `configured = ledger.bundles.has(openPkg.name)`, and the
+    // ledger is the set of `key` options registered into
+    // `plugins.bundle.config` (config-ledger.ts). The name on the left is what
+    // the Host reports for the bundle; the key on the right is what this plugin
+    // wrote. When the two disagree — a package RENAME leaves the profile calling
+    // us `@local/dsh-asar-framework` while the bundle is
+    // `@dx12xyz/dsh-asar-framework` — the lookup misses and the ENTIRE settings
+    // card silently disappears: no error, no empty state, just a page without
+    // its configuration section.
+    //
+    // So the package's own name is registered immediately (the first frame must
+    // never be short of a card, and it is also the only key a failed probe can
+    // leave behind), and `apply` then fills in whatever names the Host's
+    // `identity` probe reports for THIS machine's profile.
+    const PACKAGE_NAME = '@dx12xyz/dsh-asar-framework';
+    const SLOT_BUNDLE_CONFIG = 'plugins.bundle.config';
+
+    // One package name, scoped or plain. A slot key comes from a file on disk,
+    // so it is validated before it becomes UI state; mirrors `isUsablePackageName`
+    // in `lib/host/identity.js` (this file is a separate browser bundle and
+    // cannot import the Host module).
+    const SCOPED_SLOT_KEY = /^(@[a-z0-9-_.]+)\/[\w.-]+$/;
+    const PLAIN_SLOT_KEY = /^[\w.-]+$/;
+
+    /**
+     * Is `value` a shape that may be used as a `plugins.bundle.config` key?
+     * @param {unknown} value
+     * @returns {boolean}
+     */
+    function isUsableSlotKey(value) {
+      if (typeof value !== 'string') return false;
+      if (value.length === 0 || value.length > 200) return false;
+      return SCOPED_SLOT_KEY.test(value) || PLAIN_SLOT_KEY.test(value);
+    }
+
     // ----------------------------------------------------------------- styles --
     // Every colour below comes from a DSH theme token. Nothing hardcodes a text
     // colour on top of a token background, because a theme is free to make that
@@ -1090,16 +1130,107 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots', 'locale'],
       apply(ctx) {
+        // Keys already registered, kept in `apply` scope so the same name is
+        // never registered twice (a duplicate keyed entry would fight itself).
+        const registeredKeys = new Set();
+        // Disposers of the ADDITIONAL cards (never the package's own name),
+        // collected inside the inject callback because the callback runs for
+        // each declaration lifetime rather than synchronously here.
+        const extraDisposers = new Map();
+
+        /**
+         * Register one `plugins.bundle.config` entry, once per key.
+         *
+         * Registration goes through `ctx.slots.inject`, the documented way to
+         * contribute into a slot another plugin declares: the callback runs for
+         * each declaration lifetime (so the card also appears when the Plugins
+         * page is remounted), and the value it returns is that lifetime's
+         * disposer, which the framework calls when the owner collapses.
+         *
+         * @param {string} key
+         * @param {boolean} track `true` for a card this plugin must be able to
+         *   unregister itself (the runtime-filled names), `false` for the
+         *   package's own name, whose lifetime is the whole plugin.
+         * @returns {boolean} whether this call actually registered a new key
+         */
+        const registerCard = (key, track) => {
+          if (!isUsableSlotKey(key) || registeredKeys.has(key)) return false;
+          registeredKeys.add(key);
+          // Contained: this card is an optional surface of the plugin. A slot
+          // that is not declared (the Plugins page disabled, a preset that binds
+          // no such slot) must never take the install overlay or the locale
+          // dictionaries down with it.
+          try {
+            ctx.slots.inject(SLOT_BUNDLE_CONFIG, () => {
+              const dispose = ctx.slots.register(
+                { name: SLOT_BUNDLE_CONFIG, key, locale: NS },
+                () => h(Boundary, null, h(SettingsCard, null)),
+              );
+              if (track && typeof dispose === 'function') {
+                const list = extraDisposers.get(key);
+                if (list === undefined) extraDisposers.set(key, [dispose]);
+                else list.push(dispose);
+              }
+              // Returning it (rather than only storing it) lets the framework
+              // collapse this registration with the owner's lifetime.
+              return dispose;
+            });
+          } catch {
+            /* optional surface: leave the rest of the plugin intact */
+            registeredKeys.delete(key);
+            return false;
+          }
+          return true;
+        };
+
+        // First frame must never be short of a card: the package's own name is
+        // registered synchronously, exactly as before 0.7.1.
+        registerCard(PACKAGE_NAME, false);
+
+        // …then the names the Host actually reports for this machine are filled
+        // in. Failure modes are enumerated on purpose, and EVERY one of them
+        // leaves the `PACKAGE_NAME` registration above in place: a Host that is
+        // not mounted yet, an offline page, an error document instead of a
+        // snapshot, a Host old enough to have no `identity`, or an unusable
+        // name. The card can only get better, never worse.
+        ctx.effect(() => {
+          let alive = true;
+          void (async () => {
+            try {
+              const snapshot = await api(`${API}/state`, null);
+              if (!alive) return;
+              const identity = snapshot !== null && typeof snapshot === 'object' ? snapshot.identity : null;
+              if (identity === null || typeof identity !== 'object') return;
+              const names = Array.isArray(identity.registeredNames) ? identity.registeredNames : [];
+              for (const name of names) registerCard(name, true);
+            } catch {
+              /* fail-soft: keep whatever is already registered */
+            }
+          })();
+          // Cleanup: unregister every card this effect ADDED. The package's own
+          // name is deliberately not tracked here — it dies with the plugin, and
+          // removing it would be the one way this cleanup could make the card
+          // worse. Each disposer is idempotent (a Cordis effect), but the calls
+          // are still guarded because the owner may have collapsed first.
+          return () => {
+            alive = false;
+            for (const [key, list] of extraDisposers) {
+              while (list.length > 0) {
+                const dispose = list.pop();
+                try { dispose(); } catch { /* already disposed with its owner */ }
+              }
+              // Allow a later re-registration of the same runtime name.
+              registeredKeys.delete(key);
+            }
+            extraDisposers.clear();
+          };
+        }, 'dsh-asar-framework: bundle-config keys');
+
         ctx.effect(() => ctx.locale.register(NS, { zh: ZHDICT, en: ENDICT }), 'dsh-asar-framework: locale dictionaries');
 
         ctx.slots.inject('shell.overlay', () => ctx.slots.register(
           { name: 'shell.overlay', id: 'dsh-asar-framework-setup', order: 950, locale: NS },
           () => h(Boundary, null, h(Overlay, null)),
-        ));
-
-        ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register(
-          { name: 'plugins.bundle.config', key: '@dx12xyz/dsh-asar-framework', locale: NS },
-          () => h(Boundary, null, h(SettingsCard, null)),
         ));
       },
     };

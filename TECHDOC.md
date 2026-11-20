@@ -404,7 +404,7 @@ Cordis 服务 `asarShell`：实跑 `import('./index.js')` 得到的成员有 **3
 
 | 方法 | 返回 |
 | --- | --- |
-| `snapshot()` | **完整形状**（已 `refresh()` 过之后）共 24 个键：`{ok, required, suppressed, suppressReason, installRoot, asarPath, state, layout, splitRegion, regionMatchesBuild, buildRegion, dshVersion, backup, bridge, powerAvailable, installRecord, installState, upgraded, edited, editPaths, editSource, editJournal, compat, lastError}` —— `lib/host/state.js` 的 `refresh()` 字面量（22 键）+ `snapshotNow()` 补的 `suppressReason` + service 补的 `ok`。**冷快照**（还没 `refresh()` 过）少 4 个编辑键（`edited` / `editPaths` / `editSource` / `editJournal` 只由 `refresh()` 写入），实跑 `state.snapshot()` 在 `refresh()` 之前打印出的是 19 键。`layout` / `splitRegion` / `regionMatchesBuild` / `buildRegion` 是布局维度新增的；`edited` / `editPaths` / `editSource` / `editJournal` 是目录编辑维度。`regionMatchesBuild` = 区域字节是本版产出的**且**长度等于 `REGION_RESERVE_BYTES`，`channelSend` 的 `EREGION_STALE` 守卫读的就是它 |
+| `snapshot()` | **完整形状**（已 `refresh()` 过之后）共 25 个键：`{ok, required, suppressed, suppressReason, installRoot, asarPath, state, layout, splitRegion, regionMatchesBuild, buildRegion, dshVersion, backup, bridge, powerAvailable, identity, installRecord, installState, upgraded, edited, editPaths, editSource, editJournal, compat, lastError}` —— `lib/host/state.js` 的 `refresh()` 字面量（23 键）+ `snapshotNow()` 补的 `suppressReason` + service 补的 `ok`。**冷快照**（还没 `refresh()` 过）少 4 个编辑键（`edited` / `editPaths` / `editSource` / `editJournal` 只由 `refresh()` 写入），实测 `state.snapshot()` 在 `refresh()` 之前打印出的是 20 键、service 补 `ok` 后 21 键。`layout` / `splitRegion` / `regionMatchesBuild` / `buildRegion` 是布局维度新增的；`edited` / `editPaths` / `editSource` / `editJournal` 是目录编辑维度；`identity` 是**登记名**维度（0.7.1 起，见 §10.2.1），冷/热快照都带，形状 `{packageName, registeredNames, profileDir, ok}`。`regionMatchesBuild` = 区域字节是本版产出的**且**长度等于 `REGION_RESERVE_BYTES`，`channelSend` 的 `EREGION_STALE` 守卫读的就是它 |
 | `paths()` | `service.paths()`：状态目录与几个固定文件的路径（`index.js:126`） |
 | `scan({drives?, extraRoots?})` | `{ok, candidates[], scannedCount, scanErrors}` |
 | `probe({root})` | `{ok, input, root, asarPath, shape, state, layout, dshVersion, backup, bridge, installState, compat}`；`root` 是**规范化后的安装根**，`input` 是用户原样输入（失败形状另带 `code`/`message`/`tried`） |
@@ -594,6 +594,48 @@ Host 服务本身仍然直接可用，客户端那一侧看到的是请求失败
   - **否** → 只显示"请先去插件页禁用依赖插件"，**不调用后端**；
   - **是** → `POST /uninstall {dependentsClosed:true}` → 还原成功 → 显示"先禁用本插件再重启 DSH"（**不再给重启按钮**）。
 - 「重新打开安装页」→ 清除历史遗留的本地存储标志（`purgeLegacyDismissFlag`）+ `POST /unsuppress`。
+
+### 10.2.1 设置卡的 key 来自 Host 探测的登记名
+
+**症状**：插件页里这个插件的整个设置卡不渲染 —— 没有报错、没有空状态，就是没有那一块。
+**根因**：`PluginManagerPage.tsx` 用 `configured = ledger.bundles.has(openPkg.name)` 决定要不要画设置卡，
+`ledger.bundles` 是 `ctx.slots.entries('plugins.bundle.config')` 里所有带 `key` 的注册
+（`config-ledger.ts` 的 `new Set(…entry.options.key…)`）。左边是 **Host 报出的登记名**，
+右边是**插件注册时写死的字面量**。一次改名（profile 仍写 `@local/dsh-asar-framework`、包名已是
+`@dx12xyz/dsh-asar-framework`）就让这两边错位，`has()` 为 false，整段卡片消失。
+`@local/dsh-power` 是正确示范：它的 key 与登记名一直是同一个名字，所以从来不出这个毛病。
+
+**修法**：key 不再写死，从 Host 读回真实登记名。分两层：
+
+1. **Host 半身** `lib/host/identity.js` 的 `detectRegisteredNames({packageRoot, packageName})`：
+   从 `packageRoot` 逐层向上（≤6 层）找 profile 目录（判定 = 有 `package.json` 且
+   `dsh.profile.bundles` 是数组），然后收两类名字 ——
+   (a) `dependencies` 里**值指向本包目录**的 key（`file:` / `link:` 两种写法，去掉协议前缀、
+   正反斜杠归一、Windows 大小写不敏感比较；值指向的目录里 `package.json.name` 等于本包名也算）；
+   (b) `dsh.profile.bundles` 里每一项，若 `node_modules/<该项>/package.json` 的 `name` 等于本包名；
+   去重排序后返回，**`packageName` 本身始终在集合里**（探测失败也有一个可用 key）。
+   任何一步失败都 fail-soft：`ok:false` + `registeredNames:[packageName]`，不抛异常。
+   包名优先读**包自己的** `package.json.name`（而不是编译期常量），所以一份 manifest 与构建不一致的
+   拷贝仍能报出自己的真相；读不到才回落到 `PACKAGE_NAME`。
+2. **`/state` 快照**新增 `identity` 字段 `{packageName, registeredNames, profileDir, ok}`
+  （键数因此 24 → 25，见 §8 的 `snapshot()` 行）。探测只在状态持有者里算一次（profile 只有在
+   重启后才可能变），不跟着 5 s 轮询反复读盘。
+3. **Client 半身**：`apply(ctx)` **先同步注册** `PACKAGE_NAME` 这一个 key（首屏一定有卡，也是
+   任何失败路径的地板），然后用 `ctx.effect` 异步 `GET <API>/state`，对
+   `identity.registeredNames` 里**每一个还没注册过的名字**再注册一份
+   `plugins.bundle.config`（同一个 `SettingsCard`）。已注册集合是 `apply` 作用域里的 `Set`，
+   重复的 key 不会再注册；**补注册的 disposer 全部收集**在 `Map<key, disposer[]>` 里
+   （收集动作在 `ctx.slots.inject` 的回调里做，因为那个回调按「声明生命周期」跑，
+   返回值就是该生命周期的 disposer），effect 的清理函数逐个调用它们，
+   所以插件被停用 / 页面重挂时不会泄漏。名字先过校验（字符串、≤200 字符、
+   `/^(@[a-z0-9-_.]+)\/[\w.-]+$/` 或 `/^[\w.-]+$/`），非法名字直接丢弃。
+   请求失败 / `/state` 是错误文档 / 旧 Host 没有 `identity` / 名字非法 —— 全都只是「什么都不补」，
+   `PACKAGE_NAME` 那张卡始终在，**设置卡只会更好、绝不会更差**。注册调用本身也包在
+   `try/catch` 里：`plugins.bundle.config` 槽位若不存在（插件页被关掉、某个 preset 没有这个槽），
+   装安装页的 `shell.overlay` 与语言词典照旧注册，不会因为少一张卡而整体挂掉。
+
+`lib/host/identity.js` 与 `client.js` 各有一份同样的名字校验（两份不能互相 import：Client 是独立
+浏览器 bundle），`test/identity.test.mjs` 与 `test/client-settings-key.test.mjs` 分别钉住这两半。
 
 ### 10.3 已删除的 `localStorage` 关闭标志，以及为什么
 

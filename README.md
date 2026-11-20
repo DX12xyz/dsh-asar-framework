@@ -33,6 +33,9 @@ DSH 桌面版的主进程代码打包在安装目录的 `resources/app.asar` 里
 
 另外还有安装链路本身：备份、三级版本检查、按布局安装/还原、命令行与设置页。
 
+插件页里的设置卡按**本机 profile 实际登记的名字**挂上去（0.7.1 起）：改名后 profile 里可能还留着旧包名，
+Host 会把新旧两种登记名都探测出来交给页面，所以不论登记名是哪一个，设置卡都照常出现。
+
 ## 安装
 
 包名 **`@dx12xyz/dsh-asar-framework`**，三条途径任选其一。详细步骤见 [docs/INSTALL.md](docs/INSTALL.md)。
@@ -57,7 +60,7 @@ pnpm add @dx12xyz/dsh-asar-framework
 **3 · GitHub Release 里的 tgz**
 
 ```powershell
-Invoke-WebRequest -Uri 'https://github.com/DX12xyz/dsh-asar-framework/releases/download/v0.7.0/dx12xyz-dsh-asar-framework-0.7.0.tgz' -OutFile .\pkg.tgz
+Invoke-WebRequest -Uri 'https://github.com/DX12xyz/dsh-asar-framework/releases/download/v0.7.2-hotfix1/dx12xyz-dsh-asar-framework-0.7.2-hotfix1.tgz' -OutFile .\pkg.tgz
 dsh plugin --profile desktop add .\pkg.tgz
 ```
 
